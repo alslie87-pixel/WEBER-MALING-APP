@@ -1,0 +1,307 @@
+import { useState, useRef, useMemo } from "react";
+import * as XLSX from "xlsx";
+import {
+  Upload, ScanLine, Check, Truck, PackageCheck, FileText,
+  ClipboardList, Eye, AlertTriangle, Building2, X, ShieldAlert,
+} from "lucide-react";
+
+const STATUSES = [
+  { key: "ny",        label: "Ny ordre",            head: "bg-slate-200 text-slate-700",  dot: "bg-slate-400" },
+  { key: "rekvirert", label: "Rekvirert",           head: "bg-amber-100 text-amber-800",  dot: "bg-amber-500" },
+  { key: "paabil",    label: "På bil",              head: "bg-blue-100 text-blue-800",    dot: "bg-blue-500" },
+  { key: "mottatt",   label: "Mottatt",             head: "bg-emerald-100 text-emerald-800", dot: "bg-emerald-500" },
+  { key: "klar",      label: "Klar til utlevering", head: "bg-teal-100 text-teal-800",    dot: "bg-teal-500" },
+];
+const STATUS_LABEL = Object.fromEntries(STATUSES.map((s) => [s.key, s.label]));
+
+const ROLES = {
+  kundesenter: {
+    label: "Kundesenter", short: "Leser alle ordre · ingen handling",
+    icon: Eye, extern: false, showKunde: true, actions: [],
+  },
+  vareforsyning: {
+    label: "Vareforsyning", short: "Lager rekvisisjon og sender til blanding",
+    icon: ClipboardList, extern: false, showKunde: true,
+    actions: [{ from: "ny", to: "rekvirert", label: "Lag rekvisisjon", icon: FileText }],
+  },
+  blanding: {
+    label: "Malingsblanding", short: "Ekstern partner · bekrefter lastet på bil",
+    icon: Truck, extern: true, showKunde: false,
+    actions: [{ from: "rekvirert", to: "paabil", label: "Lastet på bil", icon: Truck }],
+  },
+  lager: {
+    label: "Lageret", short: "Bekrefter mottak og klargjør for kunde",
+    icon: PackageCheck, extern: false, showKunde: true,
+    actions: [
+      { from: "paabil", to: "mottatt", label: "Bekreft mottatt", icon: PackageCheck },
+      { from: "mottatt", to: "klar", label: "Klar til utlevering", icon: Check },
+    ],
+  },
+};
+
+const SEED = [
+  { id: "4501", kunde: "Byggmester Nilsen",  farge: "RAL 9010 Hvit",      antall: 3, status: "ny" },
+  { id: "4502", kunde: "Hansen Bygg",        farge: "RAL 3020 Rød",       antall: 2, status: "ny" },
+  { id: "4498", kunde: "Oslo Eiendom",       farge: "RAL 5015 Blå",       antall: 5, status: "rekvirert" },
+  { id: "4497", kunde: "Vestby Sameie",      farge: "NCS S 9000-N Sort",  antall: 1, status: "rekvirert" },
+  { id: "4490", kunde: "Lien & Sønn",        farge: "RAL 6018 Grønn",     antall: 4, status: "paabil" },
+  { id: "4491", kunde: "Sør Entreprenør",    farge: "RAL 3020 Rød",       antall: 2, status: "paabil" },
+  { id: "4485", kunde: "Fjordbygg",          farge: "RAL 9010 Hvit",      antall: 6, status: "mottatt" },
+  { id: "4484", kunde: "Moe Eiendom",        farge: "RAL 1021 Gul",       antall: 2, status: "mottatt" },
+  { id: "4480", kunde: "Berger AS",          farge: "RAL 7016 Antrasitt", antall: 3, status: "klar" },
+];
+
+function Barcode({ code }) {
+  const bars = [];
+  for (const ch of String(code)) {
+    const c = ch.charCodeAt(0);
+    bars.push({ w: (c % 3) + 1, on: true });
+    bars.push({ w: (c % 2) + 1, on: false });
+  }
+  return (
+    <div className="flex items-end h-7 gap-px overflow-hidden" aria-hidden>
+      {bars.map((b, i) => (
+        <span key={i} className={b.on ? "bg-slate-900" : "bg-transparent"} style={{ width: b.w + "px", height: "100%" }} />
+      ))}
+    </div>
+  );
+}
+
+export default function Malingssporing() {
+  const [role, setRole] = useState("kundesenter");
+  const [orders, setOrders] = useState(SEED);
+  const [toast, setToast] = useState(null);
+  const [highlight, setHighlight] = useState(null);
+  const [scan, setScan] = useState("");
+  const [dragOver, setDragOver] = useState(false);
+  const fileRef = useRef(null);
+
+  const cfg = ROLES[role];
+
+  function flash(type, msg) {
+    setToast({ type, msg });
+    clearTimeout(flash._t);
+    flash._t = setTimeout(() => setToast(null), 3200);
+  }
+
+  function advance(order, action) {
+    setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, status: action.to } : o)));
+    flash("ok", `✓ #${order.id} → ${STATUS_LABEL[action.to]}`);
+    setHighlight(order.id);
+    setTimeout(() => setHighlight(null), 1500);
+  }
+
+  function handleScan(value) {
+    const v = String(value).trim();
+    if (!v) return;
+    setScan("");
+    const matches = orders.filter(
+      (o) => o.id.toLowerCase() === v.toLowerCase() ||
+             o.farge.toLowerCase().includes(v.toLowerCase())
+    );
+    if (matches.length === 0) return flash("err", `Ingen ordre funnet for «${v}»`);
+    if (matches.length > 1)
+      return flash("warn", `${matches.length} ordre har denne fargen — skann ordrenr i stedet`);
+
+    const o = matches[0];
+    const action = cfg.actions.find((a) => a.from === o.status);
+    setHighlight(o.id);
+    setTimeout(() => setHighlight(null), 1500);
+    if (action) return advance(o, action);
+    flash("info", `#${o.id} · ${o.farge} · status: ${STATUS_LABEL[o.status]}`);
+  }
+
+  function parseFile(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: "array" });
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+        const find = (row, keys) => {
+          const k = Object.keys(row).find((kk) =>
+            keys.some((t) => kk.toLowerCase().replace(/\s|\./g, "").includes(t)));
+          return k ? row[k] : "";
+        };
+        const mapped = rows.map((r, i) => ({
+          id: String(find(r, ["ordrenr", "ordre", "ordernr"]) || `?${i + 1}`),
+          kunde: String(find(r, ["kunde", "customer"]) || "—"),
+          farge: String(find(r, ["farge", "fargekode", "color", "ral"]) || "—"),
+          antall: Number(find(r, ["antall", "qty", "stk"]) || 1) || 1,
+          status: String(find(r, ["status"]) || "ny").toLowerCase().replace(/\s/g, "") || "ny",
+        })).filter((r) => r.id);
+        if (!mapped.length) return flash("err", "Fant ingen rader i fila");
+        const valid = new Set(STATUSES.map((s) => s.key));
+        setOrders(mapped.map((m) => (valid.has(m.status) ? m : { ...m, status: "ny" })));
+        flash("ok", `Lastet inn ${mapped.length} ordre fra ${file.name}`);
+      } catch {
+        flash("err", "Klarte ikke å lese fila — er det en gyldig Excel?");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  const counts = useMemo(() => {
+    const c = {};
+    for (const o of orders) c[o.status] = (c[o.status] || 0) + 1;
+    return c;
+  }, [orders]);
+
+  const canUpload = role === "kundesenter" || role === "vareforsyning";
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900" style={{ fontFamily: "ui-sans-serif, system-ui" }}>
+      {/* Header */}
+      <header className="bg-slate-900 text-white">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded bg-amber-400 flex items-center justify-center text-slate-900 font-black">M</div>
+              <div>
+                <div className="font-bold tracking-tight leading-tight">Malingssporing</div>
+                <div className="text-xs text-slate-400">Ordre · rekvisisjon · lasting · mottak</div>
+              </div>
+            </div>
+            <div className="flex gap-1 bg-slate-800 p-1 rounded-lg">
+              {Object.entries(ROLES).map(([key, r]) => {
+                const Icon = r.icon;
+                const active = key === role;
+                return (
+                  <button key={key} onClick={() => setRole(key)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition ${
+                      active ? "bg-white text-slate-900" : "text-slate-300 hover:text-white"}`}>
+                    <Icon size={15} /> {r.label}
+                    {r.extern && <span className="ml-1 text-[10px] px-1 py-0.5 rounded bg-amber-400 text-slate-900 font-bold">EKST</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 py-5">
+        {/* Role context line */}
+        <div className="flex items-center gap-2 text-sm text-slate-600 mb-4">
+          <cfg.icon size={16} className="text-slate-400" />
+          <span className="font-semibold text-slate-800">{cfg.label}</span>
+          <span className="text-slate-400">·</span>
+          <span>{cfg.short}</span>
+        </div>
+
+        {/* External data-minimization banner */}
+        {cfg.extern && (
+          <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+            <ShieldAlert className="text-amber-600 shrink-0 mt-0.5" size={18} />
+            <div className="text-sm text-amber-900">
+              <span className="font-semibold">Ekstern partner — begrenset innsyn.</span>{" "}
+              Malingsblanding ser kun <b>ordrenr</b>, <b>fargekode</b> og <b>antall</b>. Kundenavn og øvrig informasjon deles aldri.
+            </div>
+          </div>
+        )}
+
+        {/* Upload zone */}
+        {canUpload && (
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) parseFile(f); }}
+            onClick={() => fileRef.current?.click()}
+            className={`mb-5 cursor-pointer rounded-xl border-2 border-dashed px-4 py-5 flex items-center gap-4 transition ${
+              dragOver ? "border-amber-400 bg-amber-50" : "border-slate-300 bg-white hover:border-slate-400"}`}>
+            <div className="w-11 h-11 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0">
+              <Upload size={20} />
+            </div>
+            <div className="text-sm">
+              <div className="font-semibold text-slate-800">Last opp dagens ordre fra SAP</div>
+              <div className="text-slate-500">Dra Excel-fila hit, eller klikk for å velge. Samme fil kan også legges i den delte mappen.</div>
+            </div>
+            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden"
+              onChange={(e) => { const f = e.target.files[0]; if (f) parseFile(f); }} />
+          </div>
+        )}
+
+        {/* Scan bar */}
+        <div className="mb-5 rounded-xl bg-white border border-slate-200 p-3 flex items-center gap-3">
+          <div className="flex items-center gap-2 text-slate-400 pl-1">
+            <ScanLine size={20} />
+          </div>
+          <input
+            value={scan}
+            onChange={(e) => setScan(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleScan(scan); }}
+            placeholder="Skann strekkode på spannet (eller skriv ordrenr / fargekode + Enter)"
+            className="flex-1 bg-transparent outline-none text-sm placeholder:text-slate-400"
+            autoFocus
+          />
+          <button onClick={() => handleScan(scan)}
+            className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800">
+            Skann
+          </button>
+        </div>
+
+        {/* Kanban */}
+        <div className="flex gap-3 overflow-x-auto pb-3">
+          {STATUSES.map((s) => {
+            const col = orders.filter((o) => o.status === s.key);
+            return (
+              <div key={s.key} className="shrink-0 w-[270px]">
+                <div className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold ${s.head}`}>
+                  <span className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${s.dot}`} />{s.label}</span>
+                  <span className="text-xs opacity-70">{counts[s.key] || 0}</span>
+                </div>
+                <div className="mt-2 flex flex-col gap-2">
+                  {col.length === 0 && (
+                    <div className="text-xs text-slate-400 px-3 py-6 text-center border border-dashed border-slate-200 rounded-lg">Ingen</div>
+                  )}
+                  {col.map((o) => {
+                    const action = cfg.actions.find((a) => a.from === o.status);
+                    const lit = highlight === o.id;
+                    return (
+                      <div key={o.id}
+                        className={`rounded-lg border bg-white p-3 transition ${lit ? "border-emerald-400 ring-2 ring-emerald-200" : "border-slate-200"}`}>
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono font-bold text-slate-900">#{o.id}</span>
+                          <span className="font-mono text-xs text-slate-500">{o.antall} spann</span>
+                        </div>
+                        <div className="mt-1 font-medium text-sm text-slate-800">{o.farge}</div>
+                        {cfg.showKunde ? (
+                          <div className="mt-0.5 text-xs text-slate-500 flex items-center gap-1">
+                            <Building2 size={12} /> {o.kunde}
+                          </div>
+                        ) : (
+                          <div className="mt-0.5 text-[11px] text-slate-300 italic">kunde skjult</div>
+                        )}
+                        <div className="mt-2"><Barcode code={o.id} /></div>
+                        {action && (
+                          <button onClick={() => advance(o, action)}
+                            className="mt-2 w-full flex items-center justify-center gap-1.5 py-2 rounded-md bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 active:scale-[0.99]">
+                            <action.icon size={15} /> {action.label}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </main>
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50">
+          <div className={`flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-sm font-medium text-white ${
+            toast.type === "ok" ? "bg-emerald-600" :
+            toast.type === "err" ? "bg-red-600" :
+            toast.type === "warn" ? "bg-amber-600" : "bg-slate-800"}`}>
+            {toast.type === "ok" && <Check size={16} />}
+            {toast.type === "err" && <X size={16} />}
+            {toast.type === "warn" && <AlertTriangle size={16} />}
+            {toast.msg}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

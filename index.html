@@ -8,12 +8,13 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body class="bg-slate-50">
   <div id="root"></div>
   <script type="text/babel" data-presets="react">
-    const { useState, useRef, useMemo } = React;
+    const { useState, useRef, useMemo, useEffect } = React;
 
     function Icon({ name, size = 18, className = "" }) {
       const p = {
@@ -34,14 +35,19 @@
       return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{p}</svg>;
     }
 
+    function QR({ value, size = 60 }) {
+      const ref = useRef(null);
+      useEffect(() => { if (ref.current && window.QRious) { new QRious({ element: ref.current, value, size, level: "M" }); } }, [value, size]);
+      return <canvas ref={ref} className="rounded bg-white" style={{ width: size, height: size }} />;
+    }
+
     const STAGES = ["ny", "rekvirert", "sendt", "mottatt", "klar"];
-    const STAGE_LABEL = {
-      ny: "Ny ordre", rekvirert: "Rekvirert", sendt: "Sendt fra Mur og Tak",
-      mottatt: "Mottatt p\u00e5 lager", klar: "Klar til utlevering",
-    };
+    const STAGE_LABEL = { ny: "Ny ordre", rekvirert: "Rekvirert", sendt: "Sendt fra Mur og Tak", mottatt: "Mottatt p\u00e5 lager", klar: "Klar til utlevering" };
+    const HEAD = { ny: "bg-slate-200 text-slate-700", rekvirert: "bg-amber-100 text-amber-800", sendt: "bg-blue-100 text-blue-800", mottatt: "bg-emerald-100 text-emerald-800", klar: "bg-teal-100 text-teal-800" };
+    const DOT = { ny: "bg-slate-400", rekvirert: "bg-amber-500", sendt: "bg-blue-500", mottatt: "bg-emerald-500", klar: "bg-teal-500" };
 
     const ROLES = {
-      kundesenter: { label: "Kundesenter", icon: "eye", extern: false },
+      kundesenter: { label: "Ordrekontor", icon: "eye", extern: false },
       vareforsyning: { label: "Vareforsyning", icon: "clipboard", extern: false },
       murogtak: { label: "Mur og Tak", icon: "truck", extern: true },
       borgelager: { label: "Borge Lager", icon: "package", extern: false },
@@ -60,42 +66,17 @@
     ];
 
     const TODAY = new Date("2026-06-03");
-    function fmtDate(iso) {
-      const d = new Date(iso);
-      return d.toLocaleDateString("nb-NO", { day: "numeric", month: "short" });
-    }
-    function daysLeft(iso) {
-      return Math.round((new Date(iso) - TODAY) / 86400000);
-    }
+    function fmtDate(iso) { return new Date(iso).toLocaleDateString("nb-NO", { day: "numeric", month: "short" }); }
+    function daysLeft(iso) { return Math.round((new Date(iso) - TODAY) / 86400000); }
     function onTrack(o) {
       if (o.status === "klar") return { label: "Klar", cls: "bg-teal-100 text-teal-800" };
-      const dl = daysLeft(o.dato);
-      const idx = STAGES.indexOf(o.status);
+      const dl = daysLeft(o.dato), idx = STAGES.indexOf(o.status);
       if (dl < 0) return { label: "Forsinket", cls: "bg-red-100 text-red-700" };
       if (dl <= 2 && idx < 2) return { label: "Risiko", cls: "bg-red-100 text-red-700" };
       if (dl <= 4 && idx < 3) return { label: "F\u00f8lg opp", cls: "bg-amber-100 text-amber-800" };
       return { label: "I rute", cls: "bg-emerald-100 text-emerald-700" };
     }
-
-    function Progress({ status }) {
-      const idx = STAGES.indexOf(status);
-      return (
-        <div className="flex items-center gap-1">
-          {STAGES.map((s, i) => (
-            <div key={s} title={STAGE_LABEL[s]}
-              className={"h-1.5 w-6 rounded-full " + (i <= idx ? (status === "klar" ? "bg-teal-500" : "bg-emerald-500") : "bg-slate-200")} />
-          ))}
-        </div>
-      );
-    }
-
-    function StatusPill({ status }) {
-      const map = {
-        ny: "bg-slate-200 text-slate-700", rekvirert: "bg-amber-100 text-amber-800",
-        sendt: "bg-blue-100 text-blue-800", mottatt: "bg-emerald-100 text-emerald-800", klar: "bg-teal-100 text-teal-800",
-      };
-      return <span className={"text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap " + map[status]}>{STAGE_LABEL[status]}</span>;
-    }
+    function StatusPill({ status }) { return <span className={"text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap " + HEAD[status]}>{STAGE_LABEL[status]}</span>; }
 
     const th = "text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400 px-3 py-2";
     const td = "px-3 py-2.5 text-sm align-middle";
@@ -118,13 +99,10 @@
       function lit(id) { setHighlight(id); setTimeout(() => setHighlight(null), 1600); }
 
       function sendRekvisisjon(o) {
-        const d = drafts[o.id] || {};
-        const rekv = (d.rekv || "").trim(), lev = (d.lev || "").trim();
+        const d = drafts[o.id] || {}; const rekv = (d.rekv || "").trim(), lev = (d.lev || "").trim();
         if (!/^19\d{5}$/.test(rekv)) return flash("err", "Rekvisisjonsnr m\u00e5 v\u00e6re 19 + 5 siffer (f.eks. 1900142)");
         if (!/^45\d{7}$/.test(lev)) return flash("err", "Leveringsnr m\u00e5 v\u00e6re 45 + 7 siffer (f.eks. 450012345)");
-        setStatus(o.id, "rekvirert", { rekv, lev });
-        flash("ok", "#" + o.id + " sendt til Mur og Tak");
-        lit(o.id);
+        setStatus(o.id, "rekvirert", { rekv, lev }); flash("ok", "#" + o.id + " sendt til Mur og Tak"); lit(o.id);
       }
       function bekreftMottatt(o) {
         const c = counts[o.id] == null ? o.antall : Number(counts[o.id]);
@@ -133,10 +111,8 @@
         else flash("ok", "#" + o.id + " mottatt \u2014 " + c + " spann OK");
         lit(o.id);
       }
-
       function handleScan(v) {
-        const val = String(v).trim(); if (!val) return; setScan("");
-        const key = val.split("|")[0];
+        const val = String(v).trim(); if (!val) return; setScan(""); const key = val.split("|")[0];
         const m = orders.filter((o) => o.id.toLowerCase() === key.toLowerCase() || ("1983-" + o.id) === key || o.kode === key);
         if (m.length === 0) return flash("err", "Ingen ordre funnet for \u00ab" + val + "\u00bb");
         if (m.length > 1) return flash("warn", m.length + " ordre matcher \u2014 skann ordrenr p\u00e5 etiketten");
@@ -144,7 +120,6 @@
         if (o.status === "sendt") flash("info", "#" + o.id + " klar til mottak \u2014 bekreft antall (" + o.antall + ")");
         else flash("info", "#" + o.id + " \u00b7 " + o.kode + " \u00b7 " + STAGE_LABEL[o.status]);
       }
-
       function parseFile(file) {
         const r = new FileReader();
         r.onload = (e) => {
@@ -161,7 +136,7 @@
               antall: Number(find(r2, ["antall", "qty", "stk"]) || 1) || 1,
               rekv: String(find(r2, ["rekvisisjon", "rekv"]) || ""),
               lev: String(find(r2, ["leveringsnr", "levering", "delivery"]) || ""),
-              dato: String(find(r2, ["leveringsdato", "dato", "dato", "date"]) || "2026-06-10"),
+              dato: String(find(r2, ["leveringsdato", "dato", "date"]) || "2026-06-10"),
               status: String(find(r2, ["status"]) || "ny").toLowerCase().replace(/\s/g, "") || "ny",
               mottatt: null,
             })).filter((x) => x.id);
@@ -173,11 +148,10 @@
         };
         r.readAsArrayBuffer(file);
       }
-
       const rowCls = (id) => "border-t border-slate-100 " + (highlight === id ? "bg-emerald-50" : "");
 
-      // ---------- KUNDESENTER ----------
-      function Kundesenter() {
+      // ---------- ORDREKONTOR (kanban) ----------
+      function Ordrekontor() {
         const q = search.toLowerCase();
         const list = orders.filter((o) => !q || o.id.includes(q) || o.kunde.toLowerCase().includes(q) || o.kode.includes(q) || o.farge.toLowerCase().includes(q));
         return (
@@ -186,29 +160,38 @@
               <Icon name="search" size={16} className="text-slate-400" />
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="S\u00f8k ordre, kunde, fargekode\u2026" className="flex-1 bg-transparent outline-none text-sm" />
             </div>
-            <div className="rounded-xl bg-white border border-slate-200 overflow-x-auto">
-              <table className="w-full min-w-[820px]">
-                <thead><tr>
-                  <th className={th}>Ordre</th><th className={th}>Kunde</th><th className={th}>Farge</th>
-                  <th className={th}>Antall</th><th className={th}>Leveringsdato</th><th className={th}>Fremdrift</th><th className={th}>P\u00e5 vei?</th>
-                </tr></thead>
-                <tbody>
-                  {list.map((o) => {
-                    const ot = onTrack(o); const dl = daysLeft(o.dato);
-                    return (
-                      <tr key={o.id} className={rowCls(o.id)}>
-                        <td className={td + " font-mono font-bold"}>#{o.id}</td>
-                        <td className={td}>{o.kunde}</td>
-                        <td className={td}><span className="font-medium">{o.farge}</span> <span className="text-slate-400 font-mono text-xs">{o.kode}</span></td>
-                        <td className={td + " font-mono"}>{o.antall}</td>
-                        <td className={td}>{fmtDate(o.dato)} <span className="text-slate-400 text-xs">({dl < 0 ? dl : "+" + dl}d)</span></td>
-                        <td className={td}><Progress status={o.status} /></td>
-                        <td className={td}><span className={"text-xs px-2 py-0.5 rounded-full font-semibold " + ot.cls}>{ot.label}</span></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className="flex gap-3 overflow-x-auto pb-3">
+              {STAGES.map((s) => {
+                const col = list.filter((o) => o.status === s);
+                return (
+                  <div key={s} className="shrink-0 w-[262px]">
+                    <div className={"flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold " + HEAD[s]}>
+                      <span className="flex items-center gap-2"><span className={"w-2 h-2 rounded-full " + DOT[s]} />{STAGE_LABEL[s]}</span>
+                      <span className="text-xs opacity-70">{col.length}</span>
+                    </div>
+                    <div className="mt-2 flex flex-col gap-2">
+                      {col.length === 0 && <div className="text-xs text-slate-400 px-3 py-6 text-center border border-dashed border-slate-200 rounded-lg">Ingen</div>}
+                      {col.map((o) => {
+                        const ot = onTrack(o), dl = daysLeft(o.dato);
+                        return (
+                          <div key={o.id} className={"rounded-lg border bg-white p-3 " + (highlight === o.id ? "border-emerald-400 ring-2 ring-emerald-200" : "border-slate-200")}>
+                            <div className="flex items-center justify-between">
+                              <span className="font-mono font-bold">#{o.id}</span>
+                              <span className={"text-xs px-2 py-0.5 rounded-full font-semibold " + ot.cls}>{ot.label}</span>
+                            </div>
+                            <div className="mt-1 text-sm font-medium">{o.farge} <span className="text-slate-400 font-mono text-xs">{o.kode}</span></div>
+                            <div className="mt-0.5 text-xs text-slate-500 flex items-center gap-1"><Icon name="building" size={12} /> {o.kunde}</div>
+                            <div className="mt-2 text-xs text-slate-600 flex items-center justify-between">
+                              <span>Frist: <b>{fmtDate(o.dato)}</b></span>
+                              <span className="text-slate-400">{dl < 0 ? dl + "d" : "+" + dl + "d"}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         );
@@ -220,31 +203,18 @@
         return (
           <div className="rounded-xl bg-white border border-slate-200 overflow-x-auto">
             <table className="w-full min-w-[880px]">
-              <thead><tr>
-                <th className={th}>Ordre</th><th className={th}>Farge</th><th className={th}>Antall</th>
-                <th className={th}>Rekvisisjon (19xxxxx)</th><th className={th}>Leveringsnr (45xxxxxxx)</th><th className={th}>Handling</th>
-              </tr></thead>
+              <thead><tr><th className={th}>Ordre</th><th className={th}>Farge</th><th className={th}>Antall</th><th className={th}>Rekvisisjon (19xxxxx)</th><th className={th}>Leveringsnr (45xxxxxxx)</th><th className={th}>Handling</th></tr></thead>
               <tbody>
                 {sorted.map((o) => {
-                  const d = drafts[o.id] || {};
-                  const isNy = o.status === "ny";
+                  const d = drafts[o.id] || {}; const isNy = o.status === "ny";
                   return (
                     <tr key={o.id} className={rowCls(o.id)}>
                       <td className={td + " font-mono font-bold"}>#{o.id}</td>
                       <td className={td}><span className="font-medium">{o.farge}</span> <span className="text-slate-400 font-mono text-xs">{o.kode}</span></td>
                       <td className={td + " font-mono"}>{o.antall}</td>
-                      <td className={td}>
-                        {isNy ? <input value={d.rekv || ""} onChange={(e) => setDrafts({ ...drafts, [o.id]: { ...d, rekv: e.target.value } })} placeholder="1900\u2026" className="w-28 border border-slate-300 rounded px-2 py-1 text-sm font-mono" />
-                              : <span className="font-mono">{o.rekv || "\u2014"}</span>}
-                      </td>
-                      <td className={td}>
-                        {isNy ? <input value={d.lev || ""} onChange={(e) => setDrafts({ ...drafts, [o.id]: { ...d, lev: e.target.value } })} placeholder="4500\u2026" className="w-32 border border-slate-300 rounded px-2 py-1 text-sm font-mono" />
-                              : <span className="font-mono">{o.lev || "\u2014"}</span>}
-                      </td>
-                      <td className={td}>
-                        {isNy ? <button onClick={() => sendRekvisisjon(o)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"><Icon name="send" size={14} /> Send til Mur og Tak</button>
-                              : <StatusPill status={o.status} />}
-                      </td>
+                      <td className={td}>{isNy ? <input value={d.rekv || ""} onChange={(e) => setDrafts({ ...drafts, [o.id]: { ...d, rekv: e.target.value } })} placeholder="1900\u2026" className="w-28 border border-slate-300 rounded px-2 py-1 text-sm font-mono" /> : <span className="font-mono">{o.rekv || "\u2014"}</span>}</td>
+                      <td className={td}>{isNy ? <input value={d.lev || ""} onChange={(e) => setDrafts({ ...drafts, [o.id]: { ...d, lev: e.target.value } })} placeholder="4500\u2026" className="w-32 border border-slate-300 rounded px-2 py-1 text-sm font-mono" /> : <span className="font-mono">{o.lev || "\u2014"}</span>}</td>
+                      <td className={td}>{isNy ? <button onClick={() => sendRekvisisjon(o)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"><Icon name="send" size={14} /> Send til Mur og Tak</button> : <StatusPill status={o.status} />}</td>
                     </tr>
                   );
                 })}
@@ -254,7 +224,7 @@
         );
       }
 
-      // ---------- MUR OG TAK (extern) ----------
+      // ---------- MUR OG TAK (extern, m/QR) ----------
       function MurOgTak() {
         const queue = orders.filter((o) => o.status === "rekvirert");
         const done = orders.filter((o) => STAGES.indexOf(o.status) > STAGES.indexOf("rekvirert"));
@@ -262,17 +232,16 @@
           <div>
             <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
               <Icon name="shield" size={18} className="text-amber-600 shrink-0 mt-0.5" />
-              <div className="text-sm text-amber-900"><span className="font-semibold">Ekstern partner \u2014 begrenset innsyn.</span> Mur og Tak ser kun rekvisisjon, ordrenr, fargekode og antall. Kundedata deles aldri.</div>
+              <div className="text-sm text-amber-900"><span className="font-semibold">Ekstern partner \u2014 begrenset innsyn.</span> Mur og Tak ser kun rekvisisjon, ordrenr, fargekode og antall. QR-etiketten inneholder ingen kundedata.</div>
             </div>
             <div className="rounded-xl bg-white border border-slate-200 overflow-x-auto">
-              <table className="w-full min-w-[680px]">
-                <thead><tr>
-                  <th className={th}>Rekvisisjon</th><th className={th}>Ordre</th><th className={th}>Fargekode</th><th className={th}>Antall</th><th className={th}>Handling</th>
-                </tr></thead>
+              <table className="w-full min-w-[760px]">
+                <thead><tr><th className={th}>Etikett (QR)</th><th className={th}>Rekvisisjon</th><th className={th}>Ordre</th><th className={th}>Fargekode</th><th className={th}>Antall</th><th className={th}>Handling</th></tr></thead>
                 <tbody>
-                  {queue.length === 0 && <tr><td className={td + " text-slate-400"} colSpan="5">Ingen nye rekvisisjoner</td></tr>}
+                  {queue.length === 0 && <tr><td className={td + " text-slate-400"} colSpan="6">Ingen nye rekvisisjoner</td></tr>}
                   {queue.map((o) => (
                     <tr key={o.id} className={rowCls(o.id)}>
+                      <td className={td}><QR value={o.id + "|" + o.kode + "|" + o.antall} size={60} /></td>
                       <td className={td + " font-mono font-bold"}>{o.rekv}</td>
                       <td className={td + " font-mono"}>#{o.id}</td>
                       <td className={td}><span className="font-mono font-semibold">{o.kode}</span> <span className="text-slate-400 text-xs">{o.farge}</span></td>
@@ -282,6 +251,7 @@
                   ))}
                   {done.map((o) => (
                     <tr key={o.id} className="border-t border-slate-100 text-slate-400">
+                      <td className={td}><Icon name="check" size={16} className="text-slate-300" /></td>
                       <td className={td + " font-mono"}>{o.rekv}</td>
                       <td className={td + " font-mono"}>#{o.id}</td>
                       <td className={td + " font-mono"}>{o.kode}</td>
@@ -296,7 +266,7 @@
         );
       }
 
-      // ---------- BORGE LAGER ----------
+      // ---------- BORGE LAGER (scan + QR) ----------
       function BorgeLager() {
         const incoming = orders.filter((o) => o.status === "sendt");
         const toPlace = orders.filter((o) => o.status === "mottatt");
@@ -304,27 +274,25 @@
           <div>
             <div className="mb-4 rounded-xl bg-white border border-slate-200 p-3 flex items-center gap-3">
               <Icon name="scan" size={20} className="text-slate-400" />
-              <input value={scan} onChange={(e) => setScan(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleScan(scan); }} autoFocus placeholder="Skann etikett (QR eller ordrenr) for \u00e5 finne rett ordre" className="flex-1 bg-transparent outline-none text-sm" />
+              <input value={scan} onChange={(e) => setScan(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleScan(scan); }} autoFocus placeholder="Skann QR-etiketten p\u00e5 spannet for \u00e5 finne rett ordre" className="flex-1 bg-transparent outline-none text-sm" />
               <button onClick={() => handleScan(scan)} className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800">Skann</button>
             </div>
 
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Innkommende \u2014 bekreft mottak</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Innkommende \u2014 skann, sjekk antall, bekreft</div>
             <div className="rounded-xl bg-white border border-slate-200 overflow-x-auto mb-6">
-              <table className="w-full min-w-[640px]">
-                <thead><tr><th className={th}>Ordre</th><th className={th}>Fargekode</th><th className={th}>Forventet</th><th className={th}>Mottatt antall</th><th className={th}>Handling</th></tr></thead>
+              <table className="w-full min-w-[720px]">
+                <thead><tr><th className={th}>Etikett (QR)</th><th className={th}>Ordre</th><th className={th}>Fargekode</th><th className={th}>Forventet</th><th className={th}>Mottatt antall</th><th className={th}>Handling</th></tr></thead>
                 <tbody>
-                  {incoming.length === 0 && <tr><td className={td + " text-slate-400"} colSpan="5">Ingen pakker p\u00e5 vei</td></tr>}
+                  {incoming.length === 0 && <tr><td className={td + " text-slate-400"} colSpan="6">Ingen pakker p\u00e5 vei</td></tr>}
                   {incoming.map((o) => {
-                    const c = counts[o.id] == null ? o.antall : counts[o.id];
-                    const mismatch = Number(c) !== o.antall;
+                    const c = counts[o.id] == null ? o.antall : counts[o.id]; const mismatch = Number(c) !== o.antall;
                     return (
                       <tr key={o.id} className={rowCls(o.id)}>
+                        <td className={td}><QR value={o.id + "|" + o.kode + "|" + o.antall} size={60} /></td>
                         <td className={td + " font-mono font-bold"}>#{o.id}</td>
                         <td className={td}><span className="font-mono font-semibold">{o.kode}</span> <span className="text-slate-400 text-xs">{o.farge}</span></td>
                         <td className={td + " font-mono"}>{o.antall} spann</td>
-                        <td className={td}>
-                          <input type="number" value={c} onChange={(e) => setCounts({ ...counts, [o.id]: e.target.value })} className={"w-20 border rounded px-2 py-1 text-sm font-mono " + (mismatch ? "border-red-400 text-red-600" : "border-slate-300")} />
-                        </td>
+                        <td className={td}><input type="number" value={c} onChange={(e) => setCounts({ ...counts, [o.id]: e.target.value })} className={"w-20 border rounded px-2 py-1 text-sm font-mono " + (mismatch ? "border-red-400 text-red-600" : "border-slate-300")} /></td>
                         <td className={td}><button onClick={() => bekreftMottatt(o)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"><Icon name="package" size={14} /> Bekreft mottatt</button></td>
                       </tr>
                     );
@@ -376,22 +344,16 @@
 
           <main className="max-w-7xl mx-auto px-4 py-5">
             {canUpload && (
-              <div onDragOver={(e) => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)}
-                onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) parseFile(f); }}
-                onClick={() => fileRef.current && fileRef.current.click()}
-                className={"mb-5 cursor-pointer rounded-xl border-2 border-dashed px-4 py-3 flex items-center gap-3 transition " + (dragOver ? "border-amber-400 bg-amber-50" : "border-slate-300 bg-white hover:border-slate-400")}>
+              <div onDragOver={(e) => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) parseFile(f); }} onClick={() => fileRef.current && fileRef.current.click()} className={"mb-5 cursor-pointer rounded-xl border-2 border-dashed px-4 py-3 flex items-center gap-3 transition " + (dragOver ? "border-amber-400 bg-amber-50" : "border-slate-300 bg-white hover:border-slate-400")}>
                 <div className="w-9 h-9 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0"><Icon name="upload" size={18} /></div>
                 <div className="text-sm"><div className="font-semibold text-slate-800">Last opp dagens ordre fra SAP</div><div className="text-slate-500 text-xs">Dra Excel-fila hit, eller klikk. Kolonner: ordrenr, kunde, postnr, fargekode, antall, leveringsdato.</div></div>
                 <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => { const f = e.target.files[0]; if (f) parseFile(f); }} />
               </div>
             )}
 
-            <div className="flex items-center gap-2 text-sm text-slate-600 mb-4">
-              <Icon name={cfg.icon} size={16} className="text-slate-400" />
-              <span className="font-semibold text-slate-800">{cfg.label}</span>
-            </div>
+            <div className="flex items-center gap-2 text-sm text-slate-600 mb-4"><Icon name={cfg.icon} size={16} className="text-slate-400" /><span className="font-semibold text-slate-800">{cfg.label}</span></div>
 
-            {role === "kundesenter" && <Kundesenter />}
+            {role === "kundesenter" && <Ordrekontor />}
             {role === "vareforsyning" && <Vareforsyning />}
             {role === "murogtak" && <MurOgTak />}
             {role === "borgelager" && <BorgeLager />}
@@ -400,8 +362,7 @@
           {toast && (
             <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50">
               <div className={"flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-sm font-medium text-white " + (toast.type === "ok" ? "bg-emerald-600" : toast.type === "err" ? "bg-red-600" : toast.type === "warn" ? "bg-amber-600" : "bg-slate-800")}>
-                {toast.type === "ok" && <Icon name="check" size={16} />}{toast.type === "err" && <Icon name="x" size={16} />}{toast.type === "warn" && <Icon name="alert" size={16} />}
-                {toast.msg}
+                {toast.type === "ok" && <Icon name="check" size={16} />}{toast.type === "err" && <Icon name="x" size={16} />}{toast.type === "warn" && <Icon name="alert" size={16} />}{toast.msg}
               </div>
             </div>
           )}

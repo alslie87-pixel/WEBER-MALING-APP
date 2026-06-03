@@ -88,6 +88,7 @@
       const [highlight, setHighlight] = useState(null);
       const [scan, setScan] = useState("");
       const [search, setSearch] = useState("");
+      const [koView, setKoView] = useState("kanban");
       const [drafts, setDrafts] = useState({});
       const [counts, setCounts] = useState({});
       const [dragOver, setDragOver] = useState(false);
@@ -154,12 +155,46 @@
       function Ordrekontor() {
         const q = search.toLowerCase();
         const list = orders.filter((o) => !q || o.id.includes(q) || o.kunde.toLowerCase().includes(q) || o.kode.includes(q) || o.farge.toLowerCase().includes(q));
+        const koList = (
+          <div className="rounded-xl bg-white border border-slate-200 overflow-x-auto">
+            <table className="w-full min-w-[820px]">
+              <thead><tr>
+                <th className={th}>Ordre</th><th className={th}>Kunde</th><th className={th}>Farge</th>
+                <th className={th}>Antall</th><th className={th}>Leveringsdato</th><th className={th}>Status</th><th className={th}>P\u00e5 vei?</th>
+              </tr></thead>
+              <tbody>
+                {list.map((o) => {
+                  const ot = onTrack(o), dl = daysLeft(o.dato);
+                  return (
+                    <tr key={o.id} className={rowCls(o.id)}>
+                      <td className={td + " font-mono font-bold"}>#{o.id}</td>
+                      <td className={td}>{o.kunde}</td>
+                      <td className={td}><span className="font-medium">{o.farge}</span> <span className="text-slate-400 font-mono text-xs">{o.kode}</span></td>
+                      <td className={td + " font-mono"}>{o.antall}</td>
+                      <td className={td}>{fmtDate(o.dato)} <span className="text-slate-400 text-xs">({dl < 0 ? dl : "+" + dl}d)</span></td>
+                      <td className={td}><StatusPill status={o.status} /></td>
+                      <td className={td}><span className={"text-xs px-2 py-0.5 rounded-full font-semibold " + ot.cls}>{ot.label}</span></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        );
         return (
           <div>
-            <div className="mb-3 flex items-center gap-2 rounded-lg bg-white border border-slate-200 px-3 py-2 max-w-md">
-              <Icon name="search" size={16} className="text-slate-400" />
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="S\u00f8k ordre, kunde, fargekode\u2026" className="flex-1 bg-transparent outline-none text-sm" />
+            <div className="mb-3 flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2 rounded-lg bg-white border border-slate-200 px-3 py-2 flex-1 max-w-md">
+                <Icon name="search" size={16} className="text-slate-400" />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="S\u00f8k ordre, kunde, fargekode\u2026" className="flex-1 bg-transparent outline-none text-sm" />
+              </div>
+              <div className="flex bg-slate-200 p-1 rounded-lg">
+                <button onClick={() => setKoView("kanban")} className={"px-3 py-1.5 rounded-md text-sm font-medium " + (koView === "kanban" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600")}>Kanban</button>
+                <button onClick={() => setKoView("list")} className={"px-3 py-1.5 rounded-md text-sm font-medium " + (koView === "list" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600")}>Liste</button>
+              </div>
             </div>
+            {koView === "list" && koList}
+            {koView === "kanban" &&
             <div className="flex gap-3 overflow-x-auto pb-3">
               {STAGES.map((s) => {
                 const col = list.filter((o) => o.status === s);
@@ -193,11 +228,10 @@
                 );
               })}
             </div>
+            }
           </div>
         );
       }
-
-      // ---------- VAREFORSYNING ----------
       function Vareforsyning() {
         const sorted = [...orders].sort((a, b) => (a.status === "ny" ? -1 : 1) - (b.status === "ny" ? -1 : 1));
         return (

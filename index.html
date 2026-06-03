@@ -47,6 +47,7 @@
     const HEAD = { ny: "bg-slate-200 text-slate-700", rekvirert: "bg-amber-100 text-amber-800", sendt: "bg-blue-100 text-blue-800", mottatt: "bg-emerald-100 text-emerald-800", klar: "bg-teal-100 text-teal-800" };
     const DOT = { ny: "bg-slate-400", rekvirert: "bg-amber-500", sendt: "bg-blue-500", mottatt: "bg-emerald-500", klar: "bg-teal-500" };
     const PROD = { "Silco Maling": "bg-sky-100 text-sky-800", "Silco Puss": "bg-orange-100 text-orange-800", "Weberton 303": "bg-violet-100 text-violet-800" };
+    const ONTRACK_RANK = { "Forsinket": 0, "Risiko": 1, "Følg opp": 2, "I rute": 3, "Klar": 4 };
 
     const ROLES = {
       kundesenter: { label: "Ordrekontor", icon: "eye", extern: false },
@@ -94,6 +95,7 @@
       const [scan, setScan] = useState("");
       const [search, setSearch] = useState("");
       const [koView, setKoView] = useState("kanban");
+      const [koSort, setKoSort] = useState({ key: "dato", dir: "asc" });
       const [drafts, setDrafts] = useState({});
       const [counts, setCounts] = useState({});
       const [bigQR, setBigQR] = useState(null);
@@ -168,15 +170,23 @@
       function Ordrekontor() {
         const q = search.toLowerCase();
         const list = orders.filter((o) => !q || o.id.includes(q) || o.kunde.toLowerCase().includes(q) || o.kode.toLowerCase().includes(q) || o.farge.toLowerCase().includes(q) || o.produkt.toLowerCase().includes(q));
+        const dir = koSort.dir === "asc" ? 1 : -1;
+        const sval = (o, k) => k === "id" ? Number(o.id) : k === "antall" ? o.antall : k === "opprettet" ? new Date(o.opprettet).getTime() : k === "dato" ? new Date(o.dato).getTime() : k === "status" ? STAGES.indexOf(o.status) : k === "ontrack" ? (ONTRACK_RANK[onTrack(o).label] ?? 9) : String(o[k] || "").toLowerCase();
+        const sortedList = [...list].sort((a, b) => { const av = sval(a, koSort.key), bv = sval(b, koSort.key); return av < bv ? -dir : av > bv ? dir : 0; });
+        const SortTh = ({ k, label }) => (
+          <th onClick={() => setKoSort((s) => ({ key: k, dir: s.key === k && s.dir === "asc" ? "desc" : "asc" }))} className={th + " cursor-pointer select-none hover:text-slate-600"}>
+            <span className="inline-flex items-center gap-1">{label}{koSort.key === k && <span className="text-slate-500">{koSort.dir === "asc" ? "▲" : "▼"}</span>}</span>
+          </th>
+        );
         const koList = (
           <div className="rounded-xl bg-white border border-slate-200 overflow-x-auto">
             <table className="w-full min-w-[1000px]">
               <thead><tr>
-                <th className={th}>Ordre</th><th className={th}>Kunde</th><th className={th}>Produkt</th><th className={th}>Farge</th>
-                <th className={th}>Antall</th><th className={th}>Opprettet</th><th className={th}>Frist</th><th className={th}>Status</th><th className={th}>På vei?</th>
+                <SortTh k="id" label="Ordre" /><SortTh k="kunde" label="Kunde" /><SortTh k="produkt" label="Produkt" /><SortTh k="farge" label="Farge" />
+                <SortTh k="antall" label="Antall" /><SortTh k="opprettet" label="Opprettet" /><SortTh k="dato" label="Frist" /><SortTh k="status" label="Status" /><SortTh k="ontrack" label="På vei?" />
               </tr></thead>
               <tbody>
-                {list.map((o) => {
+                {sortedList.map((o) => {
                   const ot = onTrack(o), dl = daysLeft(o.dato);
                   return (
                     <tr key={o.lid} className={rowCls(o.lid)}>
@@ -212,7 +222,7 @@
             {koView === "kanban" &&
             <div className="flex gap-3 overflow-x-auto pb-3">
               {STAGES.map((s) => {
-                const col = list.filter((o) => o.status === s);
+                const col = list.filter((o) => o.status === s).sort((a, b) => new Date(a.dato) - new Date(b.dato));
                 return (
                   <div key={s} className="shrink-0 w-[264px]">
                     <div className={"flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold " + HEAD[s]}>
@@ -323,8 +333,8 @@
 
       // ---------- BORGE LAGER ----------
       function BorgeLager() {
-        const incoming = orders.filter((o) => o.status === "sendt");
-        const toPlace = orders.filter((o) => o.status === "mottatt");
+        const incoming = orders.filter((o) => o.status === "sendt").sort((a, b) => new Date(a.dato) - new Date(b.dato));
+        const toPlace = orders.filter((o) => o.status === "mottatt").sort((a, b) => new Date(a.dato) - new Date(b.dato));
         return (
           <div>
             <div className="mb-4 rounded-xl bg-white border border-slate-200 p-3 flex items-center gap-3">

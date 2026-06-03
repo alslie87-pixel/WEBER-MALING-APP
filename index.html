@@ -14,7 +14,7 @@
 <body class="bg-slate-50">
   <div id="root"></div>
   <script type="text/babel" data-presets="react">
-    const { useState, useRef, useMemo, useEffect } = React;
+    const { useState, useRef, useEffect } = React;
 
     function Icon({ name, size = 18, className = "" }) {
       const p = {
@@ -27,6 +27,7 @@
         x: <><path d="M18 6L6 18"/><path d="M6 6l12 12"/></>,
         alert: <><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></>,
         search: <><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></>,
+        zoomin: <><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/><path d="M11 8v6"/><path d="M8 11h6"/></>,
         send: <><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></>,
         upload: <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></>,
         building: <><rect x="4" y="2" width="16" height="20" rx="1"/><path d="M9 22v-4h6v4"/></>,
@@ -35,16 +36,17 @@
       return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{p}</svg>;
     }
 
-    function QR({ value, size = 60 }) {
+    function QR({ value, size = 56 }) {
       const ref = useRef(null);
       useEffect(() => { if (ref.current && window.QRious) { new QRious({ element: ref.current, value, size, level: "M" }); } }, [value, size]);
-      return <canvas ref={ref} className="rounded bg-white" style={{ width: size, height: size }} />;
+      return <canvas ref={ref} className="rounded bg-white border border-slate-100" style={{ width: size, height: size }} />;
     }
 
     const STAGES = ["ny", "rekvirert", "sendt", "mottatt", "klar"];
-    const STAGE_LABEL = { ny: "Ny ordre", rekvirert: "Rekvirert", sendt: "Sendt fra Mur og Tak", mottatt: "Mottatt p\u00e5 lager", klar: "Klar til utlevering" };
+    const STAGE_LABEL = { ny: "Ny ordre", rekvirert: "Rekvirert", sendt: "Sendt fra Mur og Tak", mottatt: "Mottatt på lager", klar: "Klar til utlevering" };
     const HEAD = { ny: "bg-slate-200 text-slate-700", rekvirert: "bg-amber-100 text-amber-800", sendt: "bg-blue-100 text-blue-800", mottatt: "bg-emerald-100 text-emerald-800", klar: "bg-teal-100 text-teal-800" };
     const DOT = { ny: "bg-slate-400", rekvirert: "bg-amber-500", sendt: "bg-blue-500", mottatt: "bg-emerald-500", klar: "bg-teal-500" };
+    const PROD = { "Silco Maling": "bg-sky-100 text-sky-800", "Silco Puss": "bg-orange-100 text-orange-800", "Weberton 303": "bg-violet-100 text-violet-800" };
 
     const ROLES = {
       kundesenter: { label: "Ordrekontor", icon: "eye", extern: false },
@@ -53,37 +55,40 @@
       borgelager: { label: "Borge Lager", icon: "package", extern: false },
     };
 
-    const SEED = [
-      { id: "4501", kunde: "Byggmester Nilsen", postnr: "0150", farge: "RAL 9010 Hvit", kode: "33010", antall: 3, rekv: "", lev: "", dato: "2026-06-10", status: "ny", mottatt: null },
-      { id: "4502", kunde: "Hansen Bygg",       postnr: "1430", farge: "RAL 3020 R\u00f8d", kode: "33020", antall: 2, rekv: "", lev: "", dato: "2026-06-05", status: "ny", mottatt: null },
-      { id: "4498", kunde: "Oslo Eiendom",      postnr: "0277", farge: "RAL 5015 Bl\u00e5", kode: "33050", antall: 5, rekv: "1900142", lev: "450012345", dato: "2026-06-12", status: "rekvirert", mottatt: null },
-      { id: "4497", kunde: "Vestby Sameie",     postnr: "1540", farge: "NCS S 9000-N Sort", kode: "33900", antall: 1, rekv: "1900143", lev: "450012346", dato: "2026-06-04", status: "rekvirert", mottatt: null },
-      { id: "4490", kunde: "Lien & S\u00f8nn",       postnr: "3045", farge: "RAL 6018 Gr\u00f8nn", kode: "33060", antall: 4, rekv: "1900140", lev: "450012340", dato: "2026-06-09", status: "sendt", mottatt: null },
-      { id: "4491", kunde: "S\u00f8r Entrepren\u00f8r",   postnr: "4630", farge: "RAL 3020 R\u00f8d", kode: "33020", antall: 2, rekv: "1900141", lev: "450012341", dato: "2026-06-11", status: "sendt", mottatt: null },
-      { id: "4485", kunde: "Fjordbygg",         postnr: "5003", farge: "RAL 9010 Hvit", kode: "33010", antall: 6, rekv: "1900138", lev: "450012338", dato: "2026-06-08", status: "mottatt", mottatt: 6 },
-      { id: "4484", kunde: "Moe Eiendom",       postnr: "7010", farge: "RAL 1021 Gul", kode: "33021", antall: 2, rekv: "1900137", lev: "450012337", dato: "2026-06-02", status: "mottatt", mottatt: 2 },
-      { id: "4480", kunde: "Berger AS",         postnr: "5251", farge: "RAL 7016 Antrasitt", kode: "33070", antall: 3, rekv: "1900135", lev: "450012335", dato: "2026-06-06", status: "klar", mottatt: 3 },
+    const ORDER_LINES = [
+      { lid: "19034501-1", id: "19034501", kunde: "Byggmester Nilsen", postnr: "0150", opprettet: "2026-05-28", dato: "2026-06-10", produkt: "Silco Maling", farge: "Hvit", kode: "33010", antall: 3, rekv: "", lev: "", status: "ny", mottatt: null },
+      { lid: "19034502-1", id: "19034502", kunde: "Hansen Bygg", postnr: "1430", opprettet: "2026-05-30", dato: "2026-06-05", produkt: "Silco Maling", farge: "Rød", kode: "33020", antall: 2, rekv: "", lev: "", status: "ny", mottatt: null },
+      { lid: "19034498-1", id: "19034498", kunde: "Oslo Eiendom", postnr: "0277", opprettet: "2026-05-27", dato: "2026-06-12", produkt: "Silco Puss", farge: "Lys grå", kode: "NCS S 2000-N", antall: 5, rekv: "1900142", lev: "450012345", status: "rekvirert", mottatt: null },
+      { lid: "19034497-1", id: "19034497", kunde: "Vestby Sameie", postnr: "1540", opprettet: "2026-05-26", dato: "2026-06-04", produkt: "Weberton 303", farge: "Sort", kode: "NCS S 9000-N", antall: 1, rekv: "1900143", lev: "450012346", status: "rekvirert", mottatt: null },
+      { lid: "19034490-1", id: "19034490", kunde: "Lien & Sønn", postnr: "3045", opprettet: "2026-05-25", dato: "2026-06-09", produkt: "Silco Maling", farge: "Grønn", kode: "33060", antall: 4, rekv: "1900140", lev: "450012340", status: "sendt", mottatt: null },
+      { lid: "19034490-2", id: "19034490", kunde: "Lien & Sønn", postnr: "3045", opprettet: "2026-05-25", dato: "2026-06-09", produkt: "Silco Puss", farge: "Grønn", kode: "33061", antall: 2, rekv: "1900140", lev: "450012347", status: "sendt", mottatt: null },
+      { lid: "19034490-3", id: "19034490", kunde: "Lien & Sønn", postnr: "3045", opprettet: "2026-05-25", dato: "2026-06-09", produkt: "Weberton 303", farge: "Grønn", kode: "33062", antall: 1, rekv: "1900140", lev: "450012348", status: "rekvirert", mottatt: null },
+      { lid: "19034491-1", id: "19034491", kunde: "Sør Entreprenør", postnr: "4630", opprettet: "2026-05-29", dato: "2026-06-11", produkt: "Silco Maling", farge: "Rød", kode: "33020", antall: 2, rekv: "1900141", lev: "450012341", status: "sendt", mottatt: null },
+      { lid: "19034485-1", id: "19034485", kunde: "Fjordbygg", postnr: "5003", opprettet: "2026-05-24", dato: "2026-06-08", produkt: "Silco Maling", farge: "Hvit", kode: "33010", antall: 6, rekv: "1900138", lev: "450012338", status: "mottatt", mottatt: 6 },
+      { lid: "19034484-1", id: "19034484", kunde: "Moe Eiendom", postnr: "7010", opprettet: "2026-05-22", dato: "2026-06-02", produkt: "Silco Puss", farge: "Gul", kode: "33021", antall: 2, rekv: "1900137", lev: "450012337", status: "mottatt", mottatt: 2 },
+      { lid: "19034480-1", id: "19034480", kunde: "Berger AS", postnr: "5251", opprettet: "2026-05-20", dato: "2026-06-06", produkt: "Weberton 303", farge: "Antrasitt", kode: "NCS S 7500-N", antall: 3, rekv: "1900135", lev: "450012335", status: "klar", mottatt: 3 },
     ];
 
     const TODAY = new Date("2026-06-03");
-    function fmtDate(iso) { return new Date(iso).toLocaleDateString("nb-NO", { day: "numeric", month: "short" }); }
-    function daysLeft(iso) { return Math.round((new Date(iso) - TODAY) / 86400000); }
+    const fmtDate = (iso) => new Date(iso).toLocaleDateString("nb-NO", { day: "numeric", month: "short" });
+    const daysLeft = (iso) => Math.round((new Date(iso) - TODAY) / 86400000);
     function onTrack(o) {
       if (o.status === "klar") return { label: "Klar", cls: "bg-teal-100 text-teal-800" };
       const dl = daysLeft(o.dato), idx = STAGES.indexOf(o.status);
       if (dl < 0) return { label: "Forsinket", cls: "bg-red-100 text-red-700" };
       if (dl <= 2 && idx < 2) return { label: "Risiko", cls: "bg-red-100 text-red-700" };
-      if (dl <= 4 && idx < 3) return { label: "F\u00f8lg opp", cls: "bg-amber-100 text-amber-800" };
+      if (dl <= 4 && idx < 3) return { label: "Følg opp", cls: "bg-amber-100 text-amber-800" };
       return { label: "I rute", cls: "bg-emerald-100 text-emerald-700" };
     }
-    function StatusPill({ status }) { return <span className={"text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap " + HEAD[status]}>{STAGE_LABEL[status]}</span>; }
+    const StatusPill = ({ status }) => <span className={"text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap " + HEAD[status]}>{STAGE_LABEL[status]}</span>;
+    const ProdTag = ({ p }) => <span className={"text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap " + (PROD[p] || "bg-slate-100 text-slate-700")}>{p}</span>;
 
     const th = "text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400 px-3 py-2";
     const td = "px-3 py-2.5 text-sm align-middle";
 
     function App() {
       const [role, setRole] = useState("kundesenter");
-      const [orders, setOrders] = useState(SEED);
+      const [orders, setOrders] = useState(ORDER_LINES);
       const [toast, setToast] = useState(null);
       const [highlight, setHighlight] = useState(null);
       const [scan, setScan] = useState("");
@@ -91,35 +96,38 @@
       const [koView, setKoView] = useState("kanban");
       const [drafts, setDrafts] = useState({});
       const [counts, setCounts] = useState({});
+      const [bigQR, setBigQR] = useState(null);
       const [dragOver, setDragOver] = useState(false);
       const fileRef = useRef(null);
       const cfg = ROLES[role];
 
       function flash(type, msg) { setToast({ type, msg }); clearTimeout(flash._t); flash._t = setTimeout(() => setToast(null), 3200); }
-      function setStatus(id, status, extra) { setOrders((p) => p.map((o) => (o.id === id ? { ...o, status, ...(extra || {}) } : o))); }
-      function lit(id) { setHighlight(id); setTimeout(() => setHighlight(null), 1600); }
+      function setStatus(lid, status, extra) { setOrders((p) => p.map((o) => (o.lid === lid ? { ...o, status, ...(extra || {}) } : o))); }
+      function lit(lid) { setHighlight(lid); setTimeout(() => setHighlight(null), 1600); }
+      const qrVal = (o) => o.lid + "|" + o.kode + "|" + o.antall;
 
       function sendRekvisisjon(o) {
-        const d = drafts[o.id] || {}; const rekv = (d.rekv || "").trim(), lev = (d.lev || "").trim();
-        if (!/^19\d{5}$/.test(rekv)) return flash("err", "Rekvisisjonsnr m\u00e5 v\u00e6re 19 + 5 siffer (f.eks. 1900142)");
-        if (!/^45\d{7}$/.test(lev)) return flash("err", "Leveringsnr m\u00e5 v\u00e6re 45 + 7 siffer (f.eks. 450012345)");
-        setStatus(o.id, "rekvirert", { rekv, lev }); flash("ok", "#" + o.id + " sendt til Mur og Tak"); lit(o.id);
+        const d = drafts[o.lid] || {}; const rekv = (d.rekv || "").trim(), lev = (d.lev || "").trim();
+        if (!/^19\d{5}$/.test(rekv)) return flash("err", "Rekvisisjonsnr må være 19 + 5 siffer (f.eks. 1900142)");
+        if (!/^45\d{7}$/.test(lev)) return flash("err", "Leveringsnr må være 45 + 7 siffer (f.eks. 450012345)");
+        setStatus(o.lid, "rekvirert", { rekv, lev }); flash("ok", "#" + o.id + " " + o.produkt + " sendt til Mur og Tak"); lit(o.lid);
       }
       function bekreftMottatt(o) {
-        const c = counts[o.id] == null ? o.antall : Number(counts[o.id]);
-        setStatus(o.id, "mottatt", { mottatt: c });
-        if (c !== o.antall) flash("warn", "#" + o.id + ": mottok " + c + " av " + o.antall + " spann \u2014 avvik notert");
-        else flash("ok", "#" + o.id + " mottatt \u2014 " + c + " spann OK");
-        lit(o.id);
+        const c = counts[o.lid] == null ? o.antall : Number(counts[o.lid]);
+        setStatus(o.lid, "mottatt", { mottatt: c });
+        if (c !== o.antall) flash("warn", "#" + o.id + ": mottok " + c + " av " + o.antall + " spann — avvik notert");
+        else flash("ok", "#" + o.id + " mottatt — " + c + " spann OK");
+        lit(o.lid);
       }
       function handleScan(v) {
         const val = String(v).trim(); if (!val) return; setScan(""); const key = val.split("|")[0];
-        const m = orders.filter((o) => o.id.toLowerCase() === key.toLowerCase() || ("1983-" + o.id) === key || o.kode === key);
-        if (m.length === 0) return flash("err", "Ingen ordre funnet for \u00ab" + val + "\u00bb");
-        if (m.length > 1) return flash("warn", m.length + " ordre matcher \u2014 skann ordrenr p\u00e5 etiketten");
-        const o = m[0]; lit(o.id);
-        if (o.status === "sendt") flash("info", "#" + o.id + " klar til mottak \u2014 bekreft antall (" + o.antall + ")");
-        else flash("info", "#" + o.id + " \u00b7 " + o.kode + " \u00b7 " + STAGE_LABEL[o.status]);
+        let m = orders.filter((o) => o.lid === key);
+        if (m.length === 0) m = orders.filter((o) => o.id === key || o.kode === key);
+        if (m.length === 0) return flash("err", "Ingen ordre funnet for «" + val + "»");
+        if (m.length > 1) return flash("warn", m.length + " batcher matcher — skann QR-etiketten på spannet");
+        const o = m[0]; lit(o.lid);
+        if (o.status === "sendt") flash("info", "#" + o.id + " " + o.produkt + " — bekreft antall (" + o.antall + ")");
+        else flash("info", "#" + o.id + " · " + o.produkt + " · " + STAGE_LABEL[o.status]);
       }
       function parseFile(file) {
         const r = new FileReader();
@@ -128,50 +136,57 @@
             const wb = XLSX.read(e.target.result, { type: "array" });
             const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
             const find = (row, keys) => { const k = Object.keys(row).find((kk) => keys.some((t) => kk.toLowerCase().replace(/\s|\./g, "").includes(t))); return k ? row[k] : ""; };
-            const mapped = rows.map((r2, i) => ({
-              id: String(find(r2, ["ordrenr", "ordre", "ordernr"]) || ("?" + (i + 1))),
-              kunde: String(find(r2, ["kunde", "customer"]) || "\u2014"),
-              postnr: String(find(r2, ["postnr", "postnummer", "zip"]) || ""),
-              farge: String(find(r2, ["farge", "ral", "color"]) || "\u2014"),
-              kode: String(find(r2, ["fargekode", "kode", "colorcode"]) || ""),
-              antall: Number(find(r2, ["antall", "qty", "stk"]) || 1) || 1,
-              rekv: String(find(r2, ["rekvisisjon", "rekv"]) || ""),
-              lev: String(find(r2, ["leveringsnr", "levering", "delivery"]) || ""),
-              dato: String(find(r2, ["leveringsdato", "dato", "date"]) || "2026-06-10"),
-              status: String(find(r2, ["status"]) || "ny").toLowerCase().replace(/\s/g, "") || "ny",
-              mottatt: null,
-            })).filter((x) => x.id);
+            const mapped = rows.map((r2, i) => {
+              const id = String(find(r2, ["ordrenr", "ordre", "ordernr"]) || ("?" + (i + 1)));
+              return {
+                lid: id + "-" + (i + 1), id,
+                kunde: String(find(r2, ["kunde", "customer"]) || "—"),
+                postnr: String(find(r2, ["postnr", "postnummer", "zip"]) || ""),
+                opprettet: String(find(r2, ["opprettet", "created", "bestilt"]) || "2026-06-01"),
+                dato: String(find(r2, ["leveringsdato", "frist", "date"]) || "2026-06-10"),
+                produkt: String(find(r2, ["produkt", "product", "type"]) || "Silco Maling"),
+                farge: String(find(r2, ["farge", "color"]) || "—"),
+                kode: String(find(r2, ["fargekode", "kode", "ncs"]) || ""),
+                antall: Number(find(r2, ["antall", "qty", "stk"]) || 1) || 1,
+                rekv: String(find(r2, ["rekvisisjon", "rekv"]) || ""),
+                lev: String(find(r2, ["leveringsnr", "levering", "delivery"]) || ""),
+                status: String(find(r2, ["status"]) || "ny").toLowerCase().replace(/\s/g, "") || "ny",
+                mottatt: null,
+              };
+            }).filter((x) => x.id);
             if (!mapped.length) return flash("err", "Fant ingen rader i fila");
             const valid = new Set(STAGES);
             setOrders(mapped.map((m) => (valid.has(m.status) ? m : { ...m, status: "ny" })));
-            flash("ok", "Lastet inn " + mapped.length + " ordre fra " + file.name);
-          } catch (err) { flash("err", "Klarte ikke \u00e5 lese fila"); }
+            flash("ok", "Lastet inn " + mapped.length + " ordrelinjer fra " + file.name);
+          } catch (err) { flash("err", "Klarte ikke å lese fila"); }
         };
         r.readAsArrayBuffer(file);
       }
-      const rowCls = (id) => "border-t border-slate-100 " + (highlight === id ? "bg-emerald-50" : "");
+      const rowCls = (lid) => "border-t border-slate-100 " + (highlight === lid ? "bg-emerald-50" : "");
 
-      // ---------- ORDREKONTOR (kanban) ----------
+      // ---------- ORDREKONTOR ----------
       function Ordrekontor() {
         const q = search.toLowerCase();
-        const list = orders.filter((o) => !q || o.id.includes(q) || o.kunde.toLowerCase().includes(q) || o.kode.includes(q) || o.farge.toLowerCase().includes(q));
+        const list = orders.filter((o) => !q || o.id.includes(q) || o.kunde.toLowerCase().includes(q) || o.kode.toLowerCase().includes(q) || o.farge.toLowerCase().includes(q) || o.produkt.toLowerCase().includes(q));
         const koList = (
           <div className="rounded-xl bg-white border border-slate-200 overflow-x-auto">
-            <table className="w-full min-w-[820px]">
+            <table className="w-full min-w-[1000px]">
               <thead><tr>
-                <th className={th}>Ordre</th><th className={th}>Kunde</th><th className={th}>Farge</th>
-                <th className={th}>Antall</th><th className={th}>Leveringsdato</th><th className={th}>Status</th><th className={th}>P\u00e5 vei?</th>
+                <th className={th}>Ordre</th><th className={th}>Kunde</th><th className={th}>Produkt</th><th className={th}>Farge</th>
+                <th className={th}>Antall</th><th className={th}>Opprettet</th><th className={th}>Frist</th><th className={th}>Status</th><th className={th}>På vei?</th>
               </tr></thead>
               <tbody>
                 {list.map((o) => {
                   const ot = onTrack(o), dl = daysLeft(o.dato);
                   return (
-                    <tr key={o.id} className={rowCls(o.id)}>
-                      <td className={td + " font-mono font-bold"}>#{o.id}</td>
+                    <tr key={o.lid} className={rowCls(o.lid)}>
+                      <td className={td + " font-mono font-bold whitespace-nowrap"}>#{o.id}</td>
                       <td className={td}>{o.kunde}</td>
+                      <td className={td}><ProdTag p={o.produkt} /></td>
                       <td className={td}><span className="font-medium">{o.farge}</span> <span className="text-slate-400 font-mono text-xs">{o.kode}</span></td>
                       <td className={td + " font-mono"}>{o.antall}</td>
-                      <td className={td}>{fmtDate(o.dato)} <span className="text-slate-400 text-xs">({dl < 0 ? dl : "+" + dl}d)</span></td>
+                      <td className={td + " whitespace-nowrap"}>{fmtDate(o.opprettet)}</td>
+                      <td className={td + " whitespace-nowrap"}>{fmtDate(o.dato)} <span className="text-slate-400 text-xs">({dl < 0 ? dl : "+" + dl}d)</span></td>
                       <td className={td}><StatusPill status={o.status} /></td>
                       <td className={td}><span className={"text-xs px-2 py-0.5 rounded-full font-semibold " + ot.cls}>{ot.label}</span></td>
                     </tr>
@@ -186,7 +201,7 @@
             <div className="mb-3 flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2 rounded-lg bg-white border border-slate-200 px-3 py-2 flex-1 max-w-md">
                 <Icon name="search" size={16} className="text-slate-400" />
-                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="S\u00f8k ordre, kunde, fargekode\u2026" className="flex-1 bg-transparent outline-none text-sm" />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Søk ordre, kunde, produkt, fargekode…" className="flex-1 bg-transparent outline-none text-sm" />
               </div>
               <div className="flex bg-slate-200 p-1 rounded-lg">
                 <button onClick={() => setKoView("kanban")} className={"px-3 py-1.5 rounded-md text-sm font-medium " + (koView === "kanban" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600")}>Kanban</button>
@@ -199,7 +214,7 @@
               {STAGES.map((s) => {
                 const col = list.filter((o) => o.status === s);
                 return (
-                  <div key={s} className="shrink-0 w-[262px]">
+                  <div key={s} className="shrink-0 w-[264px]">
                     <div className={"flex items-center justify-between px-3 py-2 rounded-lg text-sm font-semibold " + HEAD[s]}>
                       <span className="flex items-center gap-2"><span className={"w-2 h-2 rounded-full " + DOT[s]} />{STAGE_LABEL[s]}</span>
                       <span className="text-xs opacity-70">{col.length}</span>
@@ -209,15 +224,16 @@
                       {col.map((o) => {
                         const ot = onTrack(o), dl = daysLeft(o.dato);
                         return (
-                          <div key={o.id} className={"rounded-lg border bg-white p-3 " + (highlight === o.id ? "border-emerald-400 ring-2 ring-emerald-200" : "border-slate-200")}>
+                          <div key={o.lid} className={"rounded-lg border bg-white p-3 " + (highlight === o.lid ? "border-emerald-400 ring-2 ring-emerald-200" : "border-slate-200")}>
                             <div className="flex items-center justify-between">
-                              <span className="font-mono font-bold">#{o.id}</span>
+                              <span className="font-mono font-bold text-sm">#{o.id}</span>
                               <span className={"text-xs px-2 py-0.5 rounded-full font-semibold " + ot.cls}>{ot.label}</span>
                             </div>
-                            <div className="mt-1 text-sm font-medium">{o.farge} <span className="text-slate-400 font-mono text-xs">{o.kode}</span></div>
+                            <div className="mt-1.5"><ProdTag p={o.produkt} /></div>
+                            <div className="mt-1.5 text-sm font-medium">{o.farge} <span className="text-slate-400 font-mono text-xs">{o.kode}</span></div>
                             <div className="mt-0.5 text-xs text-slate-500 flex items-center gap-1"><Icon name="building" size={12} /> {o.kunde}</div>
-                            <div className="mt-2 text-xs text-slate-600 flex items-center justify-between">
-                              <span>Frist: <b>{fmtDate(o.dato)}</b></span>
+                            <div className="mt-2 text-xs text-slate-600 flex items-center justify-between border-t border-slate-100 pt-2">
+                              <span>Frist <b>{fmtDate(o.dato)}</b></span>
                               <span className="text-slate-400">{dl < 0 ? dl + "d" : "+" + dl + "d"}</span>
                             </div>
                           </div>
@@ -232,22 +248,25 @@
           </div>
         );
       }
+
+      // ---------- VAREFORSYNING ----------
       function Vareforsyning() {
         const sorted = [...orders].sort((a, b) => (a.status === "ny" ? -1 : 1) - (b.status === "ny" ? -1 : 1));
         return (
           <div className="rounded-xl bg-white border border-slate-200 overflow-x-auto">
-            <table className="w-full min-w-[880px]">
-              <thead><tr><th className={th}>Ordre</th><th className={th}>Farge</th><th className={th}>Antall</th><th className={th}>Rekvisisjon (19xxxxx)</th><th className={th}>Leveringsnr (45xxxxxxx)</th><th className={th}>Handling</th></tr></thead>
+            <table className="w-full min-w-[980px]">
+              <thead><tr><th className={th}>Ordre</th><th className={th}>Produkt</th><th className={th}>Farge</th><th className={th}>Antall</th><th className={th}>Rekvisisjon (19xxxxx)</th><th className={th}>Leveringsnr (45xxxxxxx)</th><th className={th}>Handling</th></tr></thead>
               <tbody>
                 {sorted.map((o) => {
-                  const d = drafts[o.id] || {}; const isNy = o.status === "ny";
+                  const d = drafts[o.lid] || {}; const isNy = o.status === "ny";
                   return (
-                    <tr key={o.id} className={rowCls(o.id)}>
-                      <td className={td + " font-mono font-bold"}>#{o.id}</td>
+                    <tr key={o.lid} className={rowCls(o.lid)}>
+                      <td className={td + " font-mono font-bold whitespace-nowrap"}>#{o.id}</td>
+                      <td className={td}><ProdTag p={o.produkt} /></td>
                       <td className={td}><span className="font-medium">{o.farge}</span> <span className="text-slate-400 font-mono text-xs">{o.kode}</span></td>
                       <td className={td + " font-mono"}>{o.antall}</td>
-                      <td className={td}>{isNy ? <input value={d.rekv || ""} onChange={(e) => setDrafts({ ...drafts, [o.id]: { ...d, rekv: e.target.value } })} placeholder="1900\u2026" className="w-28 border border-slate-300 rounded px-2 py-1 text-sm font-mono" /> : <span className="font-mono">{o.rekv || "\u2014"}</span>}</td>
-                      <td className={td}>{isNy ? <input value={d.lev || ""} onChange={(e) => setDrafts({ ...drafts, [o.id]: { ...d, lev: e.target.value } })} placeholder="4500\u2026" className="w-32 border border-slate-300 rounded px-2 py-1 text-sm font-mono" /> : <span className="font-mono">{o.lev || "\u2014"}</span>}</td>
+                      <td className={td}>{isNy ? <input value={d.rekv || ""} onChange={(e) => setDrafts({ ...drafts, [o.lid]: { ...d, rekv: e.target.value } })} placeholder="1900…" className="w-28 border border-slate-300 rounded px-2 py-1 text-sm font-mono" /> : <span className="font-mono">{o.rekv || "—"}</span>}</td>
+                      <td className={td}>{isNy ? <input value={d.lev || ""} onChange={(e) => setDrafts({ ...drafts, [o.lid]: { ...d, lev: e.target.value } })} placeholder="4500…" className="w-32 border border-slate-300 rounded px-2 py-1 text-sm font-mono" /> : <span className="font-mono">{o.lev || "—"}</span>}</td>
                       <td className={td}>{isNy ? <button onClick={() => sendRekvisisjon(o)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"><Icon name="send" size={14} /> Send til Mur og Tak</button> : <StatusPill status={o.status} />}</td>
                     </tr>
                   );
@@ -258,7 +277,7 @@
         );
       }
 
-      // ---------- MUR OG TAK (extern, m/QR) ----------
+      // ---------- MUR OG TAK ----------
       function MurOgTak() {
         const queue = orders.filter((o) => o.status === "rekvirert");
         const done = orders.filter((o) => STAGES.indexOf(o.status) > STAGES.indexOf("rekvirert"));
@@ -266,31 +285,33 @@
           <div>
             <div className="mb-4 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
               <Icon name="shield" size={18} className="text-amber-600 shrink-0 mt-0.5" />
-              <div className="text-sm text-amber-900"><span className="font-semibold">Ekstern partner \u2014 begrenset innsyn.</span> Mur og Tak ser kun rekvisisjon, ordrenr, fargekode og antall. QR-etiketten inneholder ingen kundedata.</div>
+              <div className="text-sm text-amber-900"><span className="font-semibold">Ekstern partner — begrenset innsyn.</span> Mur og Tak ser kun rekvisisjon, ordrenr, produkt, fargekode og antall. QR-etiketten inneholder ingen kundedata.</div>
             </div>
             <div className="rounded-xl bg-white border border-slate-200 overflow-x-auto">
-              <table className="w-full min-w-[760px]">
-                <thead><tr><th className={th}>Etikett (QR)</th><th className={th}>Rekvisisjon</th><th className={th}>Ordre</th><th className={th}>Fargekode</th><th className={th}>Antall</th><th className={th}>Handling</th></tr></thead>
+              <table className="w-full min-w-[840px]">
+                <thead><tr><th className={th}>Etikett</th><th className={th}>Rekvisisjon</th><th className={th}>Ordre</th><th className={th}>Produkt</th><th className={th}>Fargekode</th><th className={th}>Antall</th><th className={th}>Handling</th></tr></thead>
                 <tbody>
-                  {queue.length === 0 && <tr><td className={td + " text-slate-400"} colSpan="6">Ingen nye rekvisisjoner</td></tr>}
+                  {queue.length === 0 && <tr><td className={td + " text-slate-400"} colSpan="7">Ingen nye rekvisisjoner</td></tr>}
                   {queue.map((o) => (
-                    <tr key={o.id} className={rowCls(o.id)}>
-                      <td className={td}><QR value={o.id + "|" + o.kode + "|" + o.antall} size={60} /></td>
+                    <tr key={o.lid} className={rowCls(o.lid)}>
+                      <td className={td}><QR value={qrVal(o)} size={56} /></td>
                       <td className={td + " font-mono font-bold"}>{o.rekv}</td>
                       <td className={td + " font-mono"}>#{o.id}</td>
+                      <td className={td}><ProdTag p={o.produkt} /></td>
                       <td className={td}><span className="font-mono font-semibold">{o.kode}</span> <span className="text-slate-400 text-xs">{o.farge}</span></td>
                       <td className={td + " font-mono"}>{o.antall} spann</td>
-                      <td className={td}><button onClick={() => { setStatus(o.id, "sendt"); flash("ok", "#" + o.id + " sendt til Borge Lager"); lit(o.id); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"><Icon name="truck" size={14} /> Sendt til Borge Lager</button></td>
+                      <td className={td}><button onClick={() => { setStatus(o.lid, "sendt"); flash("ok", "#" + o.id + " " + o.produkt + " sendt til Borge Lager"); lit(o.lid); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"><Icon name="truck" size={14} /> Sendt til Borge Lager</button></td>
                     </tr>
                   ))}
                   {done.map((o) => (
-                    <tr key={o.id} className="border-t border-slate-100 text-slate-400">
+                    <tr key={o.lid} className="border-t border-slate-100 text-slate-400">
                       <td className={td}><Icon name="check" size={16} className="text-slate-300" /></td>
                       <td className={td + " font-mono"}>{o.rekv}</td>
                       <td className={td + " font-mono"}>#{o.id}</td>
+                      <td className={td}>{o.produkt}</td>
                       <td className={td + " font-mono"}>{o.kode}</td>
                       <td className={td + " font-mono"}>{o.antall}</td>
-                      <td className={td}><span className="text-xs">Sendt \u2713</span></td>
+                      <td className={td}><span className="text-xs">Sendt ✓</span></td>
                     </tr>
                   ))}
                 </tbody>
@@ -300,7 +321,7 @@
         );
       }
 
-      // ---------- BORGE LAGER (scan + QR) ----------
+      // ---------- BORGE LAGER ----------
       function BorgeLager() {
         const incoming = orders.filter((o) => o.status === "sendt");
         const toPlace = orders.filter((o) => o.status === "mottatt");
@@ -308,25 +329,31 @@
           <div>
             <div className="mb-4 rounded-xl bg-white border border-slate-200 p-3 flex items-center gap-3">
               <Icon name="scan" size={20} className="text-slate-400" />
-              <input value={scan} onChange={(e) => setScan(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleScan(scan); }} autoFocus placeholder="Skann QR-etiketten p\u00e5 spannet for \u00e5 finne rett ordre" className="flex-1 bg-transparent outline-none text-sm" />
+              <input value={scan} onChange={(e) => setScan(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleScan(scan); }} autoFocus placeholder="Skann QR-etiketten på spannet for å finne rett ordre" className="flex-1 bg-transparent outline-none text-sm" />
               <button onClick={() => handleScan(scan)} className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800">Skann</button>
             </div>
 
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Innkommende \u2014 skann, sjekk antall, bekreft</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Innkommende — skann, sjekk antall, bekreft</div>
             <div className="rounded-xl bg-white border border-slate-200 overflow-x-auto mb-6">
-              <table className="w-full min-w-[720px]">
-                <thead><tr><th className={th}>Etikett (QR)</th><th className={th}>Ordre</th><th className={th}>Fargekode</th><th className={th}>Forventet</th><th className={th}>Mottatt antall</th><th className={th}>Handling</th></tr></thead>
+              <table className="w-full min-w-[820px]">
+                <thead><tr><th className={th}>Etikett</th><th className={th}>Ordre</th><th className={th}>Produkt</th><th className={th}>Fargekode</th><th className={th}>Forventet</th><th className={th}>Mottatt</th><th className={th}>Handling</th></tr></thead>
                 <tbody>
-                  {incoming.length === 0 && <tr><td className={td + " text-slate-400"} colSpan="6">Ingen pakker p\u00e5 vei</td></tr>}
+                  {incoming.length === 0 && <tr><td className={td + " text-slate-400"} colSpan="7">Ingen pakker på vei</td></tr>}
                   {incoming.map((o) => {
-                    const c = counts[o.id] == null ? o.antall : counts[o.id]; const mismatch = Number(c) !== o.antall;
+                    const c = counts[o.lid] == null ? o.antall : counts[o.lid]; const mismatch = Number(c) !== o.antall;
                     return (
-                      <tr key={o.id} className={rowCls(o.id)}>
-                        <td className={td}><QR value={o.id + "|" + o.kode + "|" + o.antall} size={60} /></td>
+                      <tr key={o.lid} className={rowCls(o.lid)}>
+                        <td className={td}>
+                          <div className="flex items-center gap-2">
+                            <QR value={qrVal(o)} size={56} />
+                            <button onClick={() => setBigQR({ value: qrVal(o), title: "#" + o.id, sub: o.produkt + " · " + o.kode + " · " + o.antall + " spann" })} title="Forstørr QR" className="p-1.5 rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50"><Icon name="zoomin" size={16} /></button>
+                          </div>
+                        </td>
                         <td className={td + " font-mono font-bold"}>#{o.id}</td>
+                        <td className={td}><ProdTag p={o.produkt} /></td>
                         <td className={td}><span className="font-mono font-semibold">{o.kode}</span> <span className="text-slate-400 text-xs">{o.farge}</span></td>
                         <td className={td + " font-mono"}>{o.antall} spann</td>
-                        <td className={td}><input type="number" value={c} onChange={(e) => setCounts({ ...counts, [o.id]: e.target.value })} className={"w-20 border rounded px-2 py-1 text-sm font-mono " + (mismatch ? "border-red-400 text-red-600" : "border-slate-300")} /></td>
+                        <td className={td}><input type="number" value={c} onChange={(e) => setCounts({ ...counts, [o.lid]: e.target.value })} className={"w-20 border rounded px-2 py-1 text-sm font-mono " + (mismatch ? "border-red-400 text-red-600" : "border-slate-300")} /></td>
                         <td className={td}><button onClick={() => bekreftMottatt(o)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"><Icon name="package" size={14} /> Bekreft mottatt</button></td>
                       </tr>
                     );
@@ -335,18 +362,19 @@
               </table>
             </div>
 
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Mottatt \u2014 plasser med riktig ordre</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Mottatt — plasser med riktig ordre</div>
             <div className="rounded-xl bg-white border border-slate-200 overflow-x-auto">
-              <table className="w-full min-w-[640px]">
-                <thead><tr><th className={th}>Ordre</th><th className={th}>Fargekode</th><th className={th}>Antall</th><th className={th}>Handling</th></tr></thead>
+              <table className="w-full min-w-[720px]">
+                <thead><tr><th className={th}>Ordre</th><th className={th}>Produkt</th><th className={th}>Fargekode</th><th className={th}>Antall</th><th className={th}>Handling</th></tr></thead>
                 <tbody>
-                  {toPlace.length === 0 && <tr><td className={td + " text-slate-400"} colSpan="4">Ingenting \u00e5 plassere</td></tr>}
+                  {toPlace.length === 0 && <tr><td className={td + " text-slate-400"} colSpan="5">Ingenting å plassere</td></tr>}
                   {toPlace.map((o) => (
-                    <tr key={o.id} className={rowCls(o.id)}>
+                    <tr key={o.lid} className={rowCls(o.lid)}>
                       <td className={td + " font-mono font-bold"}>#{o.id}</td>
+                      <td className={td}><ProdTag p={o.produkt} /></td>
                       <td className={td}><span className="font-mono font-semibold">{o.kode}</span> <span className="text-slate-400 text-xs">{o.farge}</span></td>
                       <td className={td + " font-mono"}>{o.mottatt} spann</td>
-                      <td className={td}><button onClick={() => { setStatus(o.id, "klar"); flash("ok", "#" + o.id + " plassert og klar"); lit(o.id); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700"><Icon name="check" size={14} /> Plassert \u2013 klar</button></td>
+                      <td className={td}><button onClick={() => { setStatus(o.lid, "klar"); flash("ok", "#" + o.id + " " + o.produkt + " plassert og klar"); lit(o.lid); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700"><Icon name="check" size={14} /> Plassert – klar</button></td>
                     </tr>
                   ))}
                 </tbody>
@@ -364,7 +392,7 @@
             <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded bg-amber-400 flex items-center justify-center text-slate-900 font-black">M</div>
-                <div><div className="font-bold leading-tight">Malingssporing</div><div className="text-xs text-slate-400">Ordre \u2192 rekvisisjon \u2192 blanding \u2192 lager \u2192 utlevering</div></div>
+                <div><div className="font-bold leading-tight">Malingssporing</div><div className="text-xs text-slate-400">Ordre → rekvisisjon → blanding → lager → utlevering</div></div>
               </div>
               <div className="flex gap-1 bg-slate-800 p-1 rounded-lg flex-wrap">
                 {Object.entries(ROLES).map(([k, r]) => (
@@ -380,7 +408,7 @@
             {canUpload && (
               <div onDragOver={(e) => { e.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) parseFile(f); }} onClick={() => fileRef.current && fileRef.current.click()} className={"mb-5 cursor-pointer rounded-xl border-2 border-dashed px-4 py-3 flex items-center gap-3 transition " + (dragOver ? "border-amber-400 bg-amber-50" : "border-slate-300 bg-white hover:border-slate-400")}>
                 <div className="w-9 h-9 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0"><Icon name="upload" size={18} /></div>
-                <div className="text-sm"><div className="font-semibold text-slate-800">Last opp dagens ordre fra SAP</div><div className="text-slate-500 text-xs">Dra Excel-fila hit, eller klikk. Kolonner: ordrenr, kunde, postnr, fargekode, antall, leveringsdato.</div></div>
+                <div className="text-sm"><div className="font-semibold text-slate-800">Last opp dagens ordre fra SAP</div><div className="text-slate-500 text-xs">Dra Excel-fila hit, eller klikk. Én rad per produktlinje: ordrenr, kunde, postnr, produkt, fargekode, antall, opprettet, leveringsdato.</div></div>
                 <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => { const f = e.target.files[0]; if (f) parseFile(f); }} />
               </div>
             )}
@@ -392,6 +420,18 @@
             {role === "murogtak" && <MurOgTak />}
             {role === "borgelager" && <BorgeLager />}
           </main>
+
+          {bigQR && (
+            <div onClick={() => setBigQR(null)} className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.55)" }}>
+              <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl p-6 w-full max-w-sm text-center relative">
+                <button onClick={() => setBigQR(null)} className="absolute top-3 right-3 text-slate-400 hover:text-slate-700"><Icon name="x" size={20} /></button>
+                <div className="flex justify-center mb-3"><QR value={bigQR.value} size={260} /></div>
+                <div className="font-mono font-bold text-lg">{bigQR.title}</div>
+                <div className="text-sm text-slate-500">{bigQR.sub}</div>
+                <div className="mt-2 text-xs text-slate-400 font-mono break-all">{bigQR.value}</div>
+              </div>
+            </div>
+          )}
 
           {toast && (
             <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50">

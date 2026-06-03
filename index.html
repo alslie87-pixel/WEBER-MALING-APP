@@ -106,6 +106,7 @@
       const [koSort, setKoSort] = useState({ key: "dato", dir: "asc" });
       const [drafts, setDrafts] = useState({});
       const [counts, setCounts] = useState({});
+      const [confirmed, setConfirmed] = useState({});
       const [bigQR, setBigQR] = useState(null);
       const [cam, setCam] = useState(false);
       const [camErr, setCamErr] = useState(null);
@@ -154,8 +155,11 @@
         if (m.length === 0) return flash("err", "Ingen ordre funnet for «" + val + "»");
         if (m.length > 1) return flash("warn", m.length + " batcher matcher — skann QR-etiketten på spannet");
         const o = m[0]; lit(o.lid);
-        if (o.status === "sendt") flash("info", "#" + o.id + " " + o.produkt + " — bekreft antall (" + o.antall + ")");
-        else flash("info", "#" + o.id + " · " + o.produkt + " · " + STAGE_LABEL[o.status]);
+        if (o.status === "sendt") {
+          setConfirmed((c) => ({ ...c, [o.lid]: true }));
+          flash("ok", "#" + o.id + " " + o.produkt + " skannet — bekrefter…");
+          setTimeout(() => { bekreftMottatt(o); setConfirmed((c) => { const n = { ...c }; delete n[o.lid]; return n; }); }, 1400);
+        } else flash("info", "#" + o.id + " · " + o.produkt + " · " + STAGE_LABEL[o.status]);
       }
       function parseFile(file) {
         const r = new FileReader();
@@ -391,7 +395,9 @@
                         <td className={td}><span className="font-mono font-semibold">{o.kode}</span> <span className="text-slate-400 text-xs">{o.farge}</span></td>
                         <td className={td + " font-mono"}>{o.antall} spann</td>
                         <td className={td}><input type="number" value={c} onChange={(e) => setCounts({ ...counts, [o.lid]: e.target.value })} className={"w-20 border rounded px-2 py-1 text-sm font-mono " + (mismatch ? "border-red-400 text-red-600" : "border-slate-300")} /></td>
-                        <td className={td}><button onClick={() => bekreftMottatt(o)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"><Icon name="package" size={14} /> Bekreft mottatt</button></td>
+                        <td className={td}>{confirmed[o.lid]
+                          ? <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-600 text-white text-sm font-semibold"><Icon name="check" size={14} /> Bekreftet</span>
+                          : <button onClick={() => bekreftMottatt(o)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800"><Icon name="package" size={14} /> Bekreft mottatt</button>}</td>
                       </tr>
                     );
                   })}

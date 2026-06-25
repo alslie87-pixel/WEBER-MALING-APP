@@ -361,7 +361,12 @@ var __Html5QrcodeLibrary__;(()=>{var t={449:function(t,e,r){!function(t){"use st
   </div>
 </div>
 <script>
-import { jsxDEV as _jsxDEV, Fragment as _Fragment } from "react/jsx-dev-runtime";
+var _Fragment = React.Fragment;
+function _jsxDEV(type, props, key) {
+  var config = props || {};
+  if (key !== undefined && key !== null) { config = Object.assign({}, config, { key: key }); }
+  return React.createElement(type, config);
+}
 const {
   useState,
   useRef,
